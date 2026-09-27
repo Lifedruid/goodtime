@@ -1,0 +1,39 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Build iOS App
+        run: |
+          cd iosApp
+          xcodebuild -project iosApp.xcodeproj \
+                     -scheme iosApp \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     -derivedDataPath build \
+                     CODE_SIGNING_ALLOWED=NO
+
+      - name: Create Unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -r iosApp/build/Build/Products/Release-iphoneos/iosApp.app Payload/
+          zip -r goodtime.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goodtime-ipa
+          path: goodtime.ipa
