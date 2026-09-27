@@ -1,39 +1,48 @@
 name: Build iOS IPA
 
 on:
+  push:
+    branches: [ "master", "main" ]
   workflow_dispatch:
 
 jobs:
   build-ios:
     runs-on: macos-latest
+
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Build iOS App
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build iOS App with Xcode
         run: |
-          cd iosApp
-          xcodebuild -project iosApp.xcodeproj \
+          xcodebuild -project iosApp/iosApp.xcodeproj \
                      -scheme iosApp \
-                     -sdk iphoneos \
                      -configuration Release \
+                     -sdk iphoneos \
                      -derivedDataPath build \
+                     CODE_SIGN_IDENTITY="" \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGN_ENTITLEMENTS="" \
                      CODE_SIGNING_ALLOWED=NO
 
-      - name: Create Unsigned IPA
+      - name: Package into IPA
         run: |
           mkdir -p Payload
-          cp -r iosApp/build/Build/Products/Release-iphoneos/iosApp.app Payload/
-          zip -r goodtime.ipa Payload
+          cp -R build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r Goodtime.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: goodtime-ipa
-          path: goodtime.ipa
+          name: Goodtime-iOS-IPA
+          path: Goodtime.ipa
+          if-no-files-found: error
