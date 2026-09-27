@@ -2,47 +2,41 @@ name: Build iOS IPA
 
 on:
   push:
-    branches: [ "master", "main" ]
-  workflow_dispatch:
+    branches: [ main ]
 
 jobs:
   build-ios:
     runs-on: macos-latest
 
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g"
+      kotlin.daemon.jvmargs: "-Xmx6g"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Set up Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      - name: Build iOS App with Xcode
+      - name: Build Xcode Archive
         run: |
-          xcodebuild -project iosApp/iosApp.xcodeproj \
-                     -scheme iosApp \
-                     -configuration Release \
-                     -sdk iphoneos \
-                     -derivedDataPath build \
-                     CODE_SIGN_IDENTITY="" \
-                     CODE_SIGNING_REQUIRED=NO \
-                     CODE_SIGN_ENTITLEMENTS="" \
-                     CODE_SIGNING_ALLOWED=NO
+          xcodebuild archive \
+            -workspace iosApp/iosApp.xcworkspace \
+            -scheme iosApp \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/iosApp.xcarchive \
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Package into IPA
-        run: |
-          mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/*.app Payload/
-          zip -r Goodtime.ipa Payload
-
-      - name: Upload IPA Artifact
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Goodtime-iOS-IPA
-          path: Goodtime.ipa
-          if-no-files-found: error
+          name: ios-archive
+          path: ${{ runner.temp }}/iosApp.xcarchive
