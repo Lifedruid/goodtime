@@ -1,13 +1,15 @@
-name: Build iOS IPA
+name: Build Unsigned iOS IPA
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch: # Allows you to trigger it manually from the Actions tab
 
 jobs:
   build-ios:
     runs-on: macos-latest
 
+    # 1. This prevents the Kotlin compiler from running out of memory (Exit Code 65)
     env:
       GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g"
       kotlin.daemon.jvmargs: "-Xmx6g"
@@ -16,27 +18,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '17'
 
-      - name: Set up Xcode
+      - name: Select Xcode 15.4
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      - name: Build Xcode Archive
+      - name: Build iOS App without Code Signing
         run: |
-          xcodebuild archive \
+          # 2. Build the app for physical iOS devices (iphoneos) but force signing off
+          xcodebuild build \
             -workspace iosApp/iosApp.xcworkspace \
             -scheme iosApp \
             -sdk iphoneos \
             -configuration Release \
-            -archivePath $RUNNER_TEMP/iosApp.xcarchive \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Upload Build Artifacts
+      - name: Package into IPA
+        run: |
+          # 3. An IPA is just a zipped folder named "Payload" containing the .app
+          mkdir Payload
+          # Copy the compiled .app from derived data into the Payload folder
+          cp -r build/Build/Products/Release-iphoneos/iosApp.app Payload/
+          # Zip it up and name it .ipa
+          zip -r Goodtime.ipa Payload
+
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-archive
-          path: ${{ runner.temp }}/iosApp.xcarchive
+          name: Goodtime-iOS-App
+          path: Goodtime.ipa
